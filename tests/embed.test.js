@@ -158,10 +158,12 @@ test('REGRESSION: censor_username=false (via config boolean false) leaves author
   assert.ok(embed.description.includes('bob'));
 });
 
-test('censor_username=true masks author names to first-char + ***', () => {
+test('censor_username=true masks author names, with the mask escaped', () => {
   const embed = buildEmbed(basePayload(), baseConfig({ censorUsername: true }));
-  assert.ok(embed.description.includes('a***'));
-  assert.ok(embed.description.includes('b***'));
+  // The asterisks are escaped so they cannot open Markdown formatting that
+  // spills across the surrounding commit lines.
+  assert.ok(embed.description.includes('a\\*\\*\\*'));
+  assert.ok(embed.description.includes('b\\*\\*\\*'));
   assert.ok(!embed.description.includes('alice'));
   assert.ok(!embed.description.includes('bob'));
 });
