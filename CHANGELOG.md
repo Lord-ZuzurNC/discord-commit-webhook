@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/Lord-ZuzurNC/discord-commit-webhook/compare/v1.3.0...v1.4.0) (2026-10-18)
+
+
+### Features
+
+* ignore the /github and /slack compatibility suffixes on the webhook URL. ([90da7c5](https://github.com/Lord-ZuzurNC/discord-commit-webhook/commit/90da7c5d79dc4bc5e9bdbcb05ad4846e6414f951))
+
 ## [1.3.0](https://github.com/Lord-ZuzurNC/discord-commit-webhook/compare/v1.2.0...v1.3.0) (2026-10-18)
 
 
