@@ -2,7 +2,6 @@
 
 ## 1.0.0 (2026-10-18)
 
-
 ### Features
 
 * initial release of discord-commit-webhook ([389e1ec](https://github.com/Lord-ZuzurNC/discord-commit-webhook/commit/389e1ec0c100eaf77872db086a66ad79e4541684))
