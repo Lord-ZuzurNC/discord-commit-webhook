@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: ['main']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - run: npm ci
+
+      - run: npm run format:check
+
+      - run: npm test
+
+      - run: npm run build
+
+      - name: Verify the committed bundle is current
+        run: |
+          if ! git diff --exit-code dist/; then
+            echo "::error::dist/ is out of date with src/. Run 'npm run build' and commit the result."
+            exit 1
+          fi

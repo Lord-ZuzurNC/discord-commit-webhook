@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  push:
+    branches: ['main']
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      # release-please talks to the API and checks nothing out, but the
+      # major-tag step below needs a real git repository and the existing tags.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          release-type: node
+
+      - name: Move the floating major tag
+        if: ${{ steps.release.outputs.release_created }}
+        run: |
+          MAJOR_TAG="v${{ steps.release.outputs.major }}"
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git tag -f "$MAJOR_TAG" '${{ steps.release.outputs.sha }}'
+          git push origin "$MAJOR_TAG" --force

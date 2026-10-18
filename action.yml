@@ -1,0 +1,73 @@
+name: 'discord-commit-webhook'
+description: 'Post a push event summary to a Discord channel or thread via an incoming webhook.'
+author: 'Lord_ZuzurNC'
+
+inputs:
+  webhook_url:
+    description: 'Full Discord webhook URL. Either this or both webhook_id and webhook_token must be set.'
+    required: false
+    default: ''
+  webhook_id:
+    description: 'Webhook id. Used only when webhook_url is absent.'
+    required: false
+    default: ''
+  webhook_token:
+    description: 'Webhook token. Used only when webhook_url is absent.'
+    required: false
+    default: ''
+  thread_id:
+    description: 'Post into this existing thread or forum post instead of the channel.'
+    required: false
+    default: ''
+  repo_name:
+    description: 'Override the repository name shown in the embed.'
+    required: false
+    default: ''
+  censor_username:
+    description: 'Mask commit author names.'
+    required: false
+    default: 'false'
+  hide_links:
+    description: 'Emit no hyperlinks at all.'
+    required: false
+    default: 'false'
+  color:
+    description: 'Embed accent colour, RRGGBB hex, leading # tolerated.'
+    required: false
+    default: '7dbbe6'
+  max_commits:
+    description: 'Maximum commits listed individually. Clamped to 25.'
+    required: false
+    default: '10'
+  commit_message_max_length:
+    description: 'Per-commit message truncation budget, in characters.'
+    required: false
+    default: '120'
+  webhook_username:
+    description: 'Override the display name of the webhook poster.'
+    required: false
+    default: ''
+  webhook_avatar_url:
+    description: 'Override the avatar of the webhook poster.'
+    required: false
+    default: ''
+  fail_on_error:
+    description: 'If false, delivery failures are warnings and the step still succeeds.'
+    required: false
+    default: 'true'
+
+outputs:
+  delivered:
+    description: "'true' if Discord accepted the message, 'false' otherwise."
+  message_id:
+    description: 'The Discord message id when one was returned, otherwise the empty string.'
+  skipped:
+    description: "'true' when the push carried no commits and nothing was posted."
+
+runs:
+  using: 'node24'
+  main: 'dist/index.js'
+
+branding:
+  icon: 'send'
+  color: 'blue'
