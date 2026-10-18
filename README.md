@@ -2,6 +2,19 @@
 
 A GitHub Action that posts a summary of a `push` event to a Discord channel or forum thread, using a Discord incoming webhook.
 
+## Contents
+
+- [discord-commit-webhook](#discord-commit-webhook)
+  - [Contents](#contents)
+  - [Quick start](#quick-start)
+  - [Inputs](#inputs)
+  - [Outputs](#outputs)
+  - [Posting into a thread or forum post](#posting-into-a-thread-or-forum-post)
+  - [Getting a Discord webhook URL](#getting-a-discord-webhook-url)
+  - [Pinning a version](#pinning-a-version)
+  - [Licence](#licence)
+
+
 ## Quick start
 
 ```yaml
@@ -61,7 +74,9 @@ Open the target channel's settings in Discord, go to **Integrations → Webhooks
 Copy its **Webhook URL**: it already contains the webhook id and token embedded in the path.
 Or, here how to extract the id and token of the Webhook URL:
 
-`https://discord.com/api/webhooks/<id>/<token>`
+```text
+https://discord.com/api/webhooks/<id>/<token>
+```
 
 Store it as a repository secret, then reference it from your workflow:
 
@@ -70,7 +85,7 @@ webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
 ```
 
 **Never commit a webhook URL directly into a workflow file**: anyone who can read it can post to your channel.
-From your repo, go to `Setting` > `Secrets and Variables` > `Actions` > `New repository secret`
+From your repo, go to `Settings` > `Secrets and Variables` > `Actions` > `New repository secret`
 
 ## Pinning a version
 
