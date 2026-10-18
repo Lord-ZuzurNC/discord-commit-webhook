@@ -96,4 +96,4 @@ uses: Lord-ZuzurNC/discord-commit-webhook@v1
 
 ## Licence
 
-MIT.
+MIT by Lord-ZuzurNC
