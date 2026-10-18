@@ -1,0 +1,67 @@
+name: Self test
+
+# Driving the action needs a real push event: it refuses any other event because
+# only a push payload carries the commits it summarises.
+# Pushing to the `selftest` branch keeps main quiet while you try things out.
+on:
+  push:
+    branches: ['selftest']
+
+permissions:
+  contents: read
+
+jobs:
+  working-tree:
+    name: Working tree (uses ./)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Default settings
+        uses: ./
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          repo_name: 'selftest · working tree · defaults'
+
+      - name: Censored authors
+        uses: ./
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          censor_username: true
+          color: 'e67e22'
+          repo_name: 'selftest · censor_username=true'
+
+      - name: No links at all
+        uses: ./
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          hide_links: true
+          color: '95a5a6'
+          repo_name: 'selftest · hide_links=true'
+
+      - name: Custom poster identity
+        id: identity
+        uses: ./
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          webhook_username: 'Selftest Bot'
+          color: '#9b59b6'
+          repo_name: 'selftest · custom identity'
+
+      - name: Report the outputs
+        run: |
+          echo "delivered  = ${{ steps.identity.outputs.delivered }}"
+          echo "message_id = ${{ steps.identity.outputs.message_id }}"
+          echo "skipped    = ${{ steps.identity.outputs.skipped }}"
+
+  published:
+    name: Published tag (uses @v1)
+    runs-on: ubuntu-latest
+    steps:
+      # No checkout needed: the action is resolved from its own repository.
+      - name: Published v1
+        uses: Lord-ZuzurNC/discord-commit-webhook@v1
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          color: '2ecc71'
+          repo_name: 'selftest · published @v1'
