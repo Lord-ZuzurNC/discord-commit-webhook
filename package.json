@@ -1,6 +1,6 @@
 {
   "name": "discord-commit-webhook",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "GitHub Action that posts a push event summary to a Discord channel or thread via an incoming webhook.",
   "private": true,
   "license": "MIT",
