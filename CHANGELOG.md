@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/Lord-ZuzurNC/discord-commit-webhook/compare/v1.0.0...v1.0.1) (2026-10-18)
+
+
+### Bug Fixes
+
+* typo in changelog... ([8473764](https://github.com/Lord-ZuzurNC/discord-commit-webhook/commit/847376429e21e6767de6973303769cb48fd67d42))
+
 ## 1.0.0 (2026-10-18)
 
 ### Features
