@@ -1,4 +1,21 @@
+import { validateFormat, FORMAT_SPECS } from './format.js';
+
 const MAX_COMMITS_CEILING = 25;
+
+/**
+ * Read every format string, falling back to its default, and reject an unknown
+ * placeholder now rather than halfway through building the embed.
+ */
+export function readFormats(core) {
+  const formats = {};
+  for (const [inputName, spec] of Object.entries(FORMAT_SPECS)) {
+    const raw = core.getInput(inputName);
+    const template = raw.length > 0 ? raw : spec.default;
+    validateFormat(template, spec.placeholders, inputName);
+    formats[spec.key] = template;
+  }
+  return formats;
+}
 
 /**
  * Resolve the Discord webhook URL from `webhook_url`, or from
@@ -102,6 +119,7 @@ export function readInputs(core) {
   const color = parseColor(colorRaw);
 
   return {
+    ...readFormats(core),
     webhookUrl,
     threadId: core.getInput('thread_id'),
     repoName: core.getInput('repo_name'),

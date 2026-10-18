@@ -28,8 +28,28 @@ jobs:
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           censor_username: true
+          hide_links: true
           color: 'e67e22'
-          repo_name: 'selftest · censor_username=true'
+          repo_name: 'selftest · censor_username + hide_links'
+
+      - name: Only one contributor censored
+        uses: ./
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          censor_names: 'Lord-ZuzurNC'
+          color: 'd35400'
+          repo_name: 'selftest · censor_names'
+
+      - name: Custom layout
+        uses: ./
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          color: '1abc9c'
+          repo_format: '📁 {repo}'
+          title_format: '⚡ {count} new {commits} on {branch}'
+          commit_format: '🔧 {sha} {subject} — {author}'
+          footer_format: '🌳 {branch} · {pusher}'
+          more_format: '➕ {count} more {commits}'
 
       - name: No links at all
         uses: ./

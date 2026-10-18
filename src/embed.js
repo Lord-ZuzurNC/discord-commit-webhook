@@ -8,6 +8,8 @@ import {
 } from './author.js';
 import { stripUrls } from './links.js';
 import { escapeMarkdown } from './markdown.js';
+import { applyFormat, DEFAULT_FORMATS } from './format.js';
+import { LIMITS, clampText, fitDescription } from './limits.js';
 
 function commitSubject(commit) {
   const message = typeof commit.message === 'string' ? commit.message : '';
@@ -23,7 +25,7 @@ export function censoringRequested(config) {
   return Boolean(config.censorUsername) || (config.censorNames ?? []).length > 0;
 }
 
-function buildAuthorLabel(commit, config, identities) {
+function buildAuthorLabel(commit, identities) {
   const label = resolveAuthorLabel(commit.author);
   // With an explicit list, only the listed people are masked; everyone else
   // keeps their name.
@@ -43,15 +45,25 @@ function buildCommitLine(commit, config, identities) {
   }
   subject = truncateSubject(subject, config.commitMessageMaxLength);
 
-  const idSpan = config.hideLinks
+  // `{sha}` is the rendered span rather than a bare id plus a separate `{url}`:
+  // handing the URL to a format string would let it put a link back in and
+  // defeat `hide_links`.
+  const shaSpan = config.hideLinks
     ? `\`${abbreviatedId}\``
     : `[\`${abbreviatedId}\`](${commit.url})`;
 
-  const authorLabel = buildAuthorLabel(commit, config, identities);
-
-  // Only the free text is escaped: the id span is ours and must keep working as
-  // a code span and a link.
-  return `${idSpan} ${escapeMarkdown(subject)} — ${escapeMarkdown(authorLabel)}`;
+  // The description renders Markdown, so the values are escaped here. The
+  // format string is not escaped: it comes from the workflow and may style the
+  // line on purpose.
+  return applyFormat(
+    config.commitFormat ?? DEFAULT_FORMATS.commitFormat,
+    {
+      sha: shaSpan,
+      subject: escapeMarkdown(subject),
+      author: escapeMarkdown(buildAuthorLabel(commit, identities)),
+    },
+    'commit_format',
+  );
 }
 
 function branchShortName(ref) {
@@ -62,20 +74,12 @@ function branchShortName(ref) {
   return typeof ref === 'string' ? ref : '';
 }
 
-function buildFooterText(payload, identities) {
-  const branch = branchShortName(payload.ref);
-  const pusherName = payload.pusher?.name;
-  if (typeof pusherName === 'string' && pusherName.length > 0) {
-    // Not escaped: Discord renders no Markdown in a footer, so the mask is safe
-    // here as-is and backslashes would be shown literally.
-    const shown = isCensoredIdentity(pusherName, identities) ? censorLabel(pusherName) : pusherName;
-    return `${branch} · ${shown}`;
-  }
-  return branch;
+function repoDisplayName(config, payload) {
+  return config.repoName ? config.repoName : (payload.repository?.full_name ?? '');
 }
 
-function repoDisplayName(config, payload) {
-  return config.repoName ? config.repoName : payload.repository?.full_name;
+function pluralise(count) {
+  return count === 1 ? 'commit' : 'commits';
 }
 
 /**
@@ -86,7 +90,6 @@ export function buildEmbed(payload, config) {
   const total = commits.length;
 
   const listedCommits = commits.slice(0, config.maxCommits);
-  const remaining = total - listedCommits.length;
 
   // Collected from every commit in the push, not just the listed ones: a listed
   // subject can name the author of a commit that did not make the cut.
@@ -99,24 +102,56 @@ export function buildEmbed(payload, config) {
       })
     : [];
 
-  const lines = listedCommits.map((commit) => buildCommitLine(commit, config, identities));
-  if (remaining > 0) {
-    lines.push(`…and ${remaining} more`);
+  const commitLines = listedCommits.map((commit) => buildCommitLine(commit, config, identities));
+
+  const buildMoreLine = (remaining) =>
+    applyFormat(
+      config.moreFormat ?? DEFAULT_FORMATS.moreFormat,
+      { count: remaining, commits: pluralise(remaining) },
+      'more_format',
+    );
+
+  const branch = branchShortName(payload.ref);
+  const repo = repoDisplayName(config, payload);
+
+  const pusherName = payload.pusher?.name;
+  let pusher = '';
+  if (typeof pusherName === 'string' && pusherName.length > 0) {
+    pusher = isCensoredIdentity(pusherName, identities) ? censorLabel(pusherName) : pusherName;
   }
 
-  const title = `${total} new commit${total === 1 ? '' : 's'}`;
-  const mostRecentCommit = commits[commits.length - 1];
+  // title, author.name and footer.text are plain text in Discord: no Markdown
+  // is rendered there, so escaping them would show the backslashes.
+  const title = applyFormat(
+    config.titleFormat ?? DEFAULT_FORMATS.titleFormat,
+    { count: total, commits: pluralise(total), branch, repo },
+    'title_format',
+  );
 
-  const author = { name: repoDisplayName(config, payload) };
+  const authorName = applyFormat(
+    config.repoFormat ?? DEFAULT_FORMATS.repoFormat,
+    { repo, branch, count: total, commits: pluralise(total) },
+    'repo_format',
+  );
+
+  const footerText = applyFormat(
+    config.footerFormat ?? DEFAULT_FORMATS.footerFormat,
+    { branch, pusher, repo, count: total, commits: pluralise(total) },
+    'footer_format',
+  );
+
+  const author = { name: clampText(authorName, LIMITS.authorName) };
   if (!config.hideLinks && payload.compare) {
     author.url = payload.compare;
   }
 
+  const mostRecentCommit = commits[commits.length - 1];
+
   return {
     author,
-    title,
-    description: lines.join('\n'),
-    footer: { text: buildFooterText(payload, identities) },
+    title: clampText(title, LIMITS.title),
+    description: fitDescription(commitLines, total, buildMoreLine),
+    footer: { text: clampText(footerText, LIMITS.footerText) },
     timestamp: mostRecentCommit?.timestamp,
     color: config.color,
   };

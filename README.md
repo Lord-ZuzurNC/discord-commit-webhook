@@ -108,6 +108,65 @@ The action emits a warning when `censor_username` is enabled and `hide_links` is
 The repository name shown in the embed header is not censored, because it is how a reader tells one repository from another.
 Override it with `repo_name` when it should not appear.
 
+## Changing the layout
+
+Five inputs control how the embed reads.
+Each one is a format string with `{placeholder}` tokens, so you can put emoji or wording wherever you like without the action needing a template file.
+
+```yaml
+with:
+  webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  repo_format: '📁 {repo}'
+  title_format: '⚡ {count} new {commits} on {branch}'
+  commit_format: '🔧 {sha} {subject} — {author}'
+  footer_format: '🌳 {branch} · {pusher}'
+  more_format: '➕ {count} more {commits}'
+```
+
+| input           | placeholders                                         | default                      |
+| --------------- | ---------------------------------------------------- | ---------------------------- |
+| `commit_format` | `{sha}` `{subject}` `{author}`                       | `{sha} {subject} — {author}` |
+| `title_format`  | `{count}` `{commits}` `{branch}` `{repo}`            | `{count} new {commits}`      |
+| `repo_format`   | `{repo}` `{branch}` `{count}` `{commits}`            | `{repo}`                     |
+| `footer_format` | `{branch}` `{pusher}` `{repo}` `{count}` `{commits}` | `{branch} · {pusher}`        |
+| `more_format`   | `{count}` `{commits}`                                | `…and {count} more`          |
+
+`{commits}` is the word `commit` or `commits`, already agreed with `{count}`.
+`{sha}` is the rendered short id: a linked code span, or a bare one when `hide_links` is set.
+
+Leaving an input unset keeps the default, so the layout only changes where you ask it to.
+
+### What the format strings can and cannot do
+
+The commit line is the only field where Discord renders Markdown, so a format string may style it — `'{sha} **{subject}**'` works.
+The title, the header and the footer are plain text in Discord, and Markdown written there would be shown literally.
+
+Values are escaped for you.
+A commit message containing `*args` cannot open formatting that spills into the following lines, whatever your format string looks like.
+
+There is deliberately no `{url}` placeholder.
+Handing out the raw commit URL would let a format string put a link back in and quietly defeat `hide_links`.
+
+An unknown placeholder fails the step immediately, naming the input and listing the ones you can use.
+Write `{{` or `}}` when you need a literal brace.
+
+An empty value takes its separator with it, so `'{branch} · {pusher}'` reads `main` rather than `main · ` when the event carries no pusher.
+
+### Keeping a format string in a file
+
+The action reads no files, so it needs no `actions/checkout`.
+If you would rather keep a long format in the repository, let the workflow read it and pass the result in:
+
+```yaml
+- id: fmt
+  run: echo "commit=$(cat .github/discord-commit-format.txt)" >> "$GITHUB_OUTPUT"
+
+- uses: Lord-ZuzurNC/discord-commit-webhook@v1
+  with:
+    webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+    commit_format: ${{ steps.fmt.outputs.commit }}
+```
+
 ## Outputs
 
 | id           | meaning                                                                   |
