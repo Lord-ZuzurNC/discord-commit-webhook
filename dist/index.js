@@ -21455,8 +21455,81 @@ function loadPushEvent({ eventName, eventPath }) {
   }
 }
 
+// src/format.js
+var FORMAT_SPECS = {
+  commit_format: {
+    key: "commitFormat",
+    placeholders: ["sha", "subject", "author"],
+    default: "{sha} {subject} \u2014 {author}"
+  },
+  title_format: {
+    key: "titleFormat",
+    placeholders: ["count", "commits", "branch", "repo"],
+    default: "{count} new {commits}"
+  },
+  repo_format: {
+    key: "repoFormat",
+    placeholders: ["repo", "branch", "count", "commits"],
+    default: "{repo}"
+  },
+  footer_format: {
+    key: "footerFormat",
+    placeholders: ["branch", "pusher", "repo", "count", "commits"],
+    default: "{branch} \xB7 {pusher}"
+  },
+  more_format: {
+    key: "moreFormat",
+    placeholders: ["count", "commits"],
+    default: "\u2026and {count} more"
+  }
+};
+var DEFAULT_FORMATS = Object.fromEntries(
+  Object.values(FORMAT_SPECS).map((spec) => [spec.key, spec.default])
+);
+var TOKEN_PATTERN = /\{\{|\}\}|\{([a-z_]+)\}/g;
+var EMPTY = "\0";
+var SEPARATORS = "\xB7\u2014|/,-";
+function collapseEmpties(text) {
+  const sep3 = `[${SEPARATORS}]`;
+  return text.replace(new RegExp(`\\s*${sep3}\\s*${EMPTY}`, "g"), "").replace(new RegExp(`${EMPTY}\\s*${sep3}\\s*`, "g"), "").split(EMPTY).join("").trim();
+}
+function applyFormat(template, values, inputName) {
+  const allowed = Object.keys(values).sort();
+  const substituted = String(template).replace(TOKEN_PATTERN, (match, name) => {
+    if (match === "{{") {
+      return "{";
+    }
+    if (match === "}}") {
+      return "}";
+    }
+    if (!Object.hasOwn(values, name)) {
+      throw new Error(
+        `Input "${inputName}" uses the unknown placeholder {${name}}. Available placeholders: ${allowed.map((key) => `{${key}}`).join(", ")}.`
+      );
+    }
+    const value = values[name];
+    const text = value === void 0 || value === null ? "" : String(value);
+    return text.length === 0 ? EMPTY : text;
+  });
+  return collapseEmpties(substituted);
+}
+function validateFormat(template, allowedNames, inputName) {
+  const probe = Object.fromEntries(allowedNames.map((name) => [name, ""]));
+  applyFormat(template, probe, inputName);
+}
+
 // src/inputs.js
 var MAX_COMMITS_CEILING = 25;
+function readFormats(core) {
+  const formats = {};
+  for (const [inputName, spec] of Object.entries(FORMAT_SPECS)) {
+    const raw = core.getInput(inputName);
+    const template = raw.length > 0 ? raw : spec.default;
+    validateFormat(template, spec.placeholders, inputName);
+    formats[spec.key] = template;
+  }
+  return formats;
+}
 function resolveWebhookUrl(core) {
   const webhookUrl = core.getInput("webhook_url");
   const webhookId = core.getInput("webhook_id");
@@ -21522,6 +21595,7 @@ function readInputs(core) {
   );
   const color = parseColor(colorRaw);
   return {
+    ...readFormats(core),
     webhookUrl,
     threadId: core.getInput("thread_id"),
     repoName: core.getInput("repo_name"),
@@ -21738,6 +21812,37 @@ function escapeMarkdown(text) {
   return text.replace(MARKDOWN_SPECIALS, (character) => `\\${character}`);
 }
 
+// src/limits.js
+var LIMITS = {
+  title: 256,
+  description: 4096,
+  footerText: 2048,
+  authorName: 256
+};
+var ELLIPSIS2 = "\u2026";
+function clampText(text, limit) {
+  const value = typeof text === "string" ? text : "";
+  const codePoints = Array.from(value);
+  if (codePoints.length <= limit) {
+    return value;
+  }
+  return codePoints.slice(0, limit - 1).join("") + ELLIPSIS2;
+}
+function fitDescription(commitLines, totalCommits, buildMoreLine, limit = LIMITS.description) {
+  for (let shown = commitLines.length; shown > 0; shown -= 1) {
+    const lines = commitLines.slice(0, shown);
+    const remaining = totalCommits - shown;
+    if (remaining > 0) {
+      lines.push(buildMoreLine(remaining));
+    }
+    const text = lines.join("\n");
+    if (text.length <= limit) {
+      return text;
+    }
+  }
+  return clampText(commitLines[0] ?? "", limit);
+}
+
 // src/embed.js
 function commitSubject(commit) {
   const message = typeof commit.message === "string" ? commit.message : "";
@@ -21746,7 +21851,7 @@ function commitSubject(commit) {
 function censoringRequested(config) {
   return Boolean(config.censorUsername) || (config.censorNames ?? []).length > 0;
 }
-function buildAuthorLabel(commit, config, identities) {
+function buildAuthorLabel(commit, identities) {
   const label = resolveAuthorLabel(commit.author);
   return isCensoredIdentity(label, identities) ? censorLabel(label) : label;
 }
@@ -21760,9 +21865,16 @@ function buildCommitLine(commit, config, identities) {
     subject = scrubIdentities(subject, identities);
   }
   subject = truncateSubject(subject, config.commitMessageMaxLength);
-  const idSpan = config.hideLinks ? `\`${abbreviatedId}\`` : `[\`${abbreviatedId}\`](${commit.url})`;
-  const authorLabel = buildAuthorLabel(commit, config, identities);
-  return `${idSpan} ${escapeMarkdown(subject)} \u2014 ${escapeMarkdown(authorLabel)}`;
+  const shaSpan = config.hideLinks ? `\`${abbreviatedId}\`` : `[\`${abbreviatedId}\`](${commit.url})`;
+  return applyFormat(
+    config.commitFormat ?? DEFAULT_FORMATS.commitFormat,
+    {
+      sha: shaSpan,
+      subject: escapeMarkdown(subject),
+      author: escapeMarkdown(buildAuthorLabel(commit, identities))
+    },
+    "commit_format"
+  );
 }
 function branchShortName(ref) {
   const prefix = "refs/heads/";
@@ -21771,42 +21883,58 @@ function branchShortName(ref) {
   }
   return typeof ref === "string" ? ref : "";
 }
-function buildFooterText(payload, identities) {
-  const branch = branchShortName(payload.ref);
-  const pusherName = payload.pusher?.name;
-  if (typeof pusherName === "string" && pusherName.length > 0) {
-    const shown = isCensoredIdentity(pusherName, identities) ? censorLabel(pusherName) : pusherName;
-    return `${branch} \xB7 ${shown}`;
-  }
-  return branch;
-}
 function repoDisplayName(config, payload) {
-  return config.repoName ? config.repoName : payload.repository?.full_name;
+  return config.repoName ? config.repoName : payload.repository?.full_name ?? "";
+}
+function pluralise(count) {
+  return count === 1 ? "commit" : "commits";
 }
 function buildEmbed(payload, config) {
   const commits = Array.isArray(payload.commits) ? payload.commits : [];
   const total = commits.length;
   const listedCommits = commits.slice(0, config.maxCommits);
-  const remaining = total - listedCommits.length;
   const identities = censoringRequested(config) ? collectIdentities(commits, payload.pusher?.name, {
     includeAuthors: Boolean(config.censorUsername),
     explicitNames: config.censorNames ?? []
   }) : [];
-  const lines = listedCommits.map((commit) => buildCommitLine(commit, config, identities));
-  if (remaining > 0) {
-    lines.push(`\u2026and ${remaining} more`);
+  const commitLines = listedCommits.map((commit) => buildCommitLine(commit, config, identities));
+  const buildMoreLine = (remaining) => applyFormat(
+    config.moreFormat ?? DEFAULT_FORMATS.moreFormat,
+    { count: remaining, commits: pluralise(remaining) },
+    "more_format"
+  );
+  const branch = branchShortName(payload.ref);
+  const repo = repoDisplayName(config, payload);
+  const pusherName = payload.pusher?.name;
+  let pusher = "";
+  if (typeof pusherName === "string" && pusherName.length > 0) {
+    pusher = isCensoredIdentity(pusherName, identities) ? censorLabel(pusherName) : pusherName;
   }
-  const title = `${total} new commit${total === 1 ? "" : "s"}`;
-  const mostRecentCommit = commits[commits.length - 1];
-  const author = { name: repoDisplayName(config, payload) };
+  const title = applyFormat(
+    config.titleFormat ?? DEFAULT_FORMATS.titleFormat,
+    { count: total, commits: pluralise(total), branch, repo },
+    "title_format"
+  );
+  const authorName = applyFormat(
+    config.repoFormat ?? DEFAULT_FORMATS.repoFormat,
+    { repo, branch, count: total, commits: pluralise(total) },
+    "repo_format"
+  );
+  const footerText = applyFormat(
+    config.footerFormat ?? DEFAULT_FORMATS.footerFormat,
+    { branch, pusher, repo, count: total, commits: pluralise(total) },
+    "footer_format"
+  );
+  const author = { name: clampText(authorName, LIMITS.authorName) };
   if (!config.hideLinks && payload.compare) {
     author.url = payload.compare;
   }
+  const mostRecentCommit = commits[commits.length - 1];
   return {
     author,
-    title,
-    description: lines.join("\n"),
-    footer: { text: buildFooterText(payload, identities) },
+    title: clampText(title, LIMITS.title),
+    description: fitDescription(commitLines, total, buildMoreLine),
+    footer: { text: clampText(footerText, LIMITS.footerText) },
     timestamp: mostRecentCommit?.timestamp,
     color: config.color
   };
