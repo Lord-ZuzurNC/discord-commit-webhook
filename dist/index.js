@@ -21480,6 +21480,19 @@ function resolveWebhookUrl(core) {
     'No usable webhook credentials: set "webhook_url", or set both "webhook_id" and "webhook_token".'
   );
 }
+function parseNameList(raw) {
+  if (typeof raw !== "string" || raw.trim().length === 0) {
+    return [];
+  }
+  const seen = /* @__PURE__ */ new Set();
+  for (const part of raw.split(/[\n,]/)) {
+    const name = part.trim();
+    if (name.length > 0) {
+      seen.add(name);
+    }
+  }
+  return Array.from(seen);
+}
 function parsePositiveInteger(name, raw) {
   const value = Number(raw);
   if (!Number.isFinite(value) || !Number.isInteger(value) || value <= 0) {
@@ -21513,6 +21526,7 @@ function readInputs(core) {
     threadId: core.getInput("thread_id"),
     repoName: core.getInput("repo_name"),
     censorUsername: core.getBooleanInput("censor_username"),
+    censorNames: parseNameList(core.getInput("censor_names")),
     hideLinks: core.getBooleanInput("hide_links"),
     color,
     maxCommits,
@@ -21621,6 +21635,93 @@ function censorLabel(label) {
   const firstCodePoint = Array.from(label)[0];
   return `${firstCodePoint}***`;
 }
+var MIN_AUTO_SCRUBBABLE_LENGTH = 3;
+var COMMON_WORDS = /* @__PURE__ */ new Set([
+  "add",
+  "admin",
+  "all",
+  "api",
+  "app",
+  "bot",
+  "build",
+  "bump",
+  "chore",
+  "ci",
+  "core",
+  "deps",
+  "dev",
+  "doc",
+  "docs",
+  "feat",
+  "fix",
+  "init",
+  "lib",
+  "main",
+  "master",
+  "merge",
+  "new",
+  "old",
+  "perf",
+  "prod",
+  "refactor",
+  "release",
+  "remove",
+  "revert",
+  "src",
+  "style",
+  "test",
+  "tests",
+  "update",
+  "user",
+  "wip"
+]);
+var SHORT_NAME_LENGTH = 4;
+function riskyNames(names) {
+  return (Array.isArray(names) ? names : []).filter(
+    (name) => Array.from(name).length < SHORT_NAME_LENGTH || COMMON_WORDS.has(name.toLowerCase())
+  );
+}
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function identityPattern(name) {
+  return new RegExp(`(?<![\\w-])${escapeRegExp(name)}(?![\\w-])`, "gi");
+}
+function collectIdentities(commits, pusherName, options = {}) {
+  const { includeAuthors = true, explicitNames = [] } = options;
+  const names = /* @__PURE__ */ new Set();
+  if (includeAuthors) {
+    for (const commit of Array.isArray(commits) ? commits : []) {
+      const label = resolveAuthorLabel(commit?.author);
+      if (label && label !== "unknown" && Array.from(label).length >= MIN_AUTO_SCRUBBABLE_LENGTH) {
+        names.add(label);
+      }
+    }
+    if (typeof pusherName === "string" && Array.from(pusherName).length >= MIN_AUTO_SCRUBBABLE_LENGTH) {
+      names.add(pusherName);
+    }
+  }
+  for (const name of explicitNames) {
+    if (typeof name === "string" && name.length > 0) {
+      names.add(name);
+    }
+  }
+  return Array.from(names).sort((a, b) => b.length - a.length);
+}
+function isCensoredIdentity(name, identities) {
+  if (typeof name !== "string" || name.length === 0) {
+    return false;
+  }
+  const lowered = name.toLowerCase();
+  return identities.some((identity) => identity.toLowerCase() === lowered);
+}
+function scrubIdentities(text, identities) {
+  let result = typeof text === "string" ? text : "";
+  for (const name of identities) {
+    result = result.replace(identityPattern(name), censorLabel(name));
+  }
+  return result;
+}
 
 // src/links.js
 var URL_PATTERN = /\bhttps?:\/\/[^\s)]+/gi;
@@ -21628,25 +21729,40 @@ function stripUrls(text) {
   return text.replace(URL_PATTERN, "").replace(/[ \t]{2,}/g, " ").trim();
 }
 
+// src/markdown.js
+var MARKDOWN_SPECIALS = /[\\*_~`|[\]]/g;
+function escapeMarkdown(text) {
+  if (typeof text !== "string") {
+    return "";
+  }
+  return text.replace(MARKDOWN_SPECIALS, (character) => `\\${character}`);
+}
+
 // src/embed.js
 function commitSubject(commit) {
   const message = typeof commit.message === "string" ? commit.message : "";
   return message.split("\n")[0];
 }
-function buildAuthorLabel(commit, config) {
-  const label = resolveAuthorLabel(commit.author);
-  return config.censorUsername ? censorLabel(label) : label;
+function censoringRequested(config) {
+  return Boolean(config.censorUsername) || (config.censorNames ?? []).length > 0;
 }
-function buildCommitLine(commit, config) {
+function buildAuthorLabel(commit, config, identities) {
+  const label = resolveAuthorLabel(commit.author);
+  return isCensoredIdentity(label, identities) ? censorLabel(label) : label;
+}
+function buildCommitLine(commit, config, identities) {
   const abbreviatedId = typeof commit.id === "string" ? commit.id.slice(0, 7) : "";
   let subject = commitSubject(commit);
   if (config.hideLinks) {
     subject = stripUrls(subject);
   }
+  if (identities.length > 0) {
+    subject = scrubIdentities(subject, identities);
+  }
   subject = truncateSubject(subject, config.commitMessageMaxLength);
   const idSpan = config.hideLinks ? `\`${abbreviatedId}\`` : `[\`${abbreviatedId}\`](${commit.url})`;
-  const authorLabel = buildAuthorLabel(commit, config);
-  return `${idSpan} ${subject} \u2014 ${authorLabel}`;
+  const authorLabel = buildAuthorLabel(commit, config, identities);
+  return `${idSpan} ${escapeMarkdown(subject)} \u2014 ${escapeMarkdown(authorLabel)}`;
 }
 function branchShortName(ref) {
   const prefix = "refs/heads/";
@@ -21655,11 +21771,12 @@ function branchShortName(ref) {
   }
   return typeof ref === "string" ? ref : "";
 }
-function buildFooterText(payload) {
+function buildFooterText(payload, identities) {
   const branch = branchShortName(payload.ref);
   const pusherName = payload.pusher?.name;
   if (typeof pusherName === "string" && pusherName.length > 0) {
-    return `${branch} \xB7 ${pusherName}`;
+    const shown = isCensoredIdentity(pusherName, identities) ? censorLabel(pusherName) : pusherName;
+    return `${branch} \xB7 ${shown}`;
   }
   return branch;
 }
@@ -21671,7 +21788,11 @@ function buildEmbed(payload, config) {
   const total = commits.length;
   const listedCommits = commits.slice(0, config.maxCommits);
   const remaining = total - listedCommits.length;
-  const lines = listedCommits.map((commit) => buildCommitLine(commit, config));
+  const identities = censoringRequested(config) ? collectIdentities(commits, payload.pusher?.name, {
+    includeAuthors: Boolean(config.censorUsername),
+    explicitNames: config.censorNames ?? []
+  }) : [];
+  const lines = listedCommits.map((commit) => buildCommitLine(commit, config, identities));
   if (remaining > 0) {
     lines.push(`\u2026and ${remaining} more`);
   }
@@ -21685,7 +21806,7 @@ function buildEmbed(payload, config) {
     author,
     title,
     description: lines.join("\n"),
-    footer: { text: buildFooterText(payload) },
+    footer: { text: buildFooterText(payload, identities) },
     timestamp: mostRecentCommit?.timestamp,
     color: config.color
   };
@@ -21790,6 +21911,17 @@ async function run() {
     return;
   }
   const config = readInputs(core_exports);
+  if (censoringRequested(config) && !config.hideLinks) {
+    warning(
+      "Censoring masks the visible names, but the commit links still contain the account that owns the repository. Set hide_links: true as well if the account must not appear at all."
+    );
+  }
+  const risky = riskyNames(config.censorNames);
+  if (risky.length > 0) {
+    warning(
+      `These censor_names entries are short or are ordinary words, so they will also redact those words from commit messages: ${risky.join(", ")}.`
+    );
+  }
   const embed = buildEmbed(payload, config);
   const body = { embeds: [embed] };
   if (config.webhookUsername) {

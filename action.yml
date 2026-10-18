@@ -24,9 +24,13 @@ inputs:
     required: false
     default: ''
   censor_username:
-    description: 'Mask commit author names.'
+    description: 'Mask the names of everyone the action can detect in the push.'
     required: false
     default: 'false'
+  censor_names:
+    description: 'Mask only these names, one per line or comma-separated. Implies censoring.'
+    required: false
+    default: ''
   hide_links:
     description: 'Emit no hyperlinks at all.'
     required: false

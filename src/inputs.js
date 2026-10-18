@@ -33,6 +33,28 @@ export function resolveWebhookUrl(core) {
 }
 
 /**
+ * Parse a delimited name list input into an array of trimmed, unique names.
+ *
+ * Action inputs arrive as environment variables, so there is no list type: the
+ * value is split on newlines and commas, which lets a workflow write either a
+ * block scalar or a single comma-separated line.
+ */
+export function parseNameList(raw) {
+  if (typeof raw !== 'string' || raw.trim().length === 0) {
+    return [];
+  }
+
+  const seen = new Set();
+  for (const part of raw.split(/[\n,]/)) {
+    const name = part.trim();
+    if (name.length > 0) {
+      seen.add(name);
+    }
+  }
+  return Array.from(seen);
+}
+
+/**
  * Parse and validate a numeric input as a finite positive integer.
  */
 export function parsePositiveInteger(name, raw) {
@@ -84,6 +106,7 @@ export function readInputs(core) {
     threadId: core.getInput('thread_id'),
     repoName: core.getInput('repo_name'),
     censorUsername: core.getBooleanInput('censor_username'),
+    censorNames: parseNameList(core.getInput('censor_names')),
     hideLinks: core.getBooleanInput('hide_links'),
     color,
     maxCommits,

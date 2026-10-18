@@ -229,8 +229,10 @@ test('E2E: censor_username=true masks author names', async (t) => {
   const embed = received[0].body.embeds[0];
   assert.ok(!embed.description.includes('alice'));
   assert.ok(!embed.description.includes('bob'));
-  assert.ok(embed.description.includes('a***'));
-  assert.ok(embed.description.includes('b***'));
+  assert.ok(embed.description.includes('a\\*\\*\\*'));
+  assert.ok(embed.description.includes('b\\*\\*\\*'));
+  // No asterisk may reach Discord unescaped.
+  assert.ok(!/(^|[^\\])\*/.test(embed.description), embed.description);
 
   rmSync(dir, { recursive: true, force: true });
 });
