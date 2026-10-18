@@ -1,4 +1,4 @@
-name: 'discord-commit-webhook'
+name: 'Discord Commit Notifier'
 description: 'Post a push event summary to a Discord channel or thread via an incoming webhook.'
 author: 'Lord_ZuzurNC'
 

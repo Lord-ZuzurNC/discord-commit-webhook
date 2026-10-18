@@ -1,16 +1,22 @@
-# discord-commit-webhook
+# Discord Commit Notifier
 
 A GitHub Action that posts a summary of a `push` event to a Discord channel or forum thread, using a Discord incoming webhook.
 
 ## Contents
 
-- [discord-commit-webhook](#discord-commit-webhook)
+- [Discord Commit Notifier](#discord-commit-notifier)
   - [Contents](#contents)
   - [Quick start](#quick-start)
   - [Inputs](#inputs)
+  - [Hiding who pushed](#hiding-who-pushed)
+    - [Short and ordinary names](#short-and-ordinary-names)
+  - [Changing the layout](#changing-the-layout)
+    - [What the format strings can and cannot do](#what-the-format-strings-can-and-cannot-do)
+    - [Keeping a format string in a file](#keeping-a-format-string-in-a-file)
   - [Outputs](#outputs)
   - [Posting into a thread or forum post](#posting-into-a-thread-or-forum-post)
   - [Getting a Discord webhook URL](#getting-a-discord-webhook-url)
+    - [Do not add `/github` to the URL](#do-not-add-github-to-the-url)
   - [Pinning a version](#pinning-a-version)
   - [Licence](#licence)
 
