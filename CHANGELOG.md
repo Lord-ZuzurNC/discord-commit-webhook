@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/Lord-ZuzurNC/discord-commit-webhook/compare/v1.4.0...v1.5.0) (2026-10-18)
+
+
+### Features
+
+* rename the action to Discord Commit Notifier for the Marketplace ([70f131c](https://github.com/Lord-ZuzurNC/discord-commit-webhook/commit/70f131c4ba44e79f721b1feca977d5b9afcd7bbe))
+
 ## [1.4.0](https://github.com/Lord-ZuzurNC/discord-commit-webhook/compare/v1.3.0...v1.4.0) (2026-10-18)
 
 
