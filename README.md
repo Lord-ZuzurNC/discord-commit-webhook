@@ -14,7 +14,6 @@ A GitHub Action that posts a summary of a `push` event to a Discord channel or f
   - [Pinning a version](#pinning-a-version)
   - [Licence](#licence)
 
-
 ## Quick start
 
 ```yaml
