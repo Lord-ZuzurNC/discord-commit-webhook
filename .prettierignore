@@ -1,4 +1,6 @@
+# Generated artefacts: their formatting is owned by the tool that writes them.
 dist/
+CHANGELOG.md
+
 node_modules/
 package-lock.json
-SPEC.md
