@@ -84,6 +84,7 @@ webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
 ```
 
 **Never commit a webhook URL directly into a workflow file**: anyone who can read it can post to your channel.
+
 From your repo, go to `Settings` > `Secrets and Variables` > `Actions` > `New repository secret`
 
 ## Pinning a version
