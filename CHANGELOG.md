@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.0](https://github.com/Lord-ZuzurNC/discord-commit-webhook/compare/v1.0.1...v1.1.0) (2026-10-18)
+
+
+### Features
+
+* little change on README to try selftest branch ([6817b99](https://github.com/Lord-ZuzurNC/discord-commit-webhook/commit/6817b998666bb5d281bd316479635b390ada21ae))
+* test selftest ([7161cc2](https://github.com/Lord-ZuzurNC/discord-commit-webhook/commit/7161cc26229d8e0002d92127ba19c283c965b6b6))
+* test selftest ([a5307a2](https://github.com/Lord-ZuzurNC/discord-commit-webhook/commit/a5307a2675e520972a6665d8ee333f15c974693d))
+
 ## [1.0.1](https://github.com/Lord-ZuzurNC/discord-commit-webhook/compare/v1.0.0...v1.0.1) (2026-10-18)
 
 
