@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/Lord-ZuzurNC/discord-commit-webhook/compare/v1.2.0...v1.3.0) (2026-10-18)
+
+
+### Features
+
+* add layout format strings and enforce Discord embed limits ([d4811e0](https://github.com/Lord-ZuzurNC/discord-commit-webhook/commit/d4811e017224110d1e8150904e68a5e493e07fa7))
+
 ## [1.2.0](https://github.com/Lord-ZuzurNC/discord-commit-webhook/compare/v1.1.0...v1.2.0) (2026-10-18)
 
 
