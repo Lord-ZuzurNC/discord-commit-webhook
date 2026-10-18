@@ -21530,6 +21530,14 @@ function readFormats(core) {
   }
   return formats;
 }
+var COMPAT_SUFFIX = /\/(github|slack)\/*$/i;
+function normaliseWebhookUrl(rawUrl) {
+  const match = COMPAT_SUFFIX.exec(rawUrl);
+  if (!match) {
+    return { url: rawUrl, strippedSuffix: null };
+  }
+  return { url: rawUrl.slice(0, match.index), strippedSuffix: match[1].toLowerCase() };
+}
 function resolveWebhookUrl(core) {
   const webhookUrl = core.getInput("webhook_url");
   const webhookId = core.getInput("webhook_id");
@@ -21542,7 +21550,14 @@ function resolveWebhookUrl(core) {
   }
   if (webhookUrl) {
     core.setSecret(webhookUrl);
-    return webhookUrl;
+    const { url, strippedSuffix } = normaliseWebhookUrl(webhookUrl);
+    if (strippedSuffix) {
+      core.setSecret(url);
+      core.notice(
+        `Ignoring the /${strippedSuffix} suffix on the webhook URL. That endpoint expects a raw ${strippedSuffix === "github" ? "GitHub" : "Slack"} payload and rejects a Discord embed; posting to the webhook itself instead.`
+      );
+    }
+    return url;
   }
   if (webhookId && webhookToken) {
     const fullUrl = `https://discord.com/api/webhooks/${webhookId}/${webhookToken}`;
