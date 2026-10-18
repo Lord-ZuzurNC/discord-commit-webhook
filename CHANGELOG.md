@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/Lord-ZuzurNC/discord-commit-webhook/compare/v1.1.0...v1.2.0) (2026-10-18)
+
+
+### Features
+
+* add censor_names, escape Discord Markdown, and extend censoring to the pusher and commit subjects ([69e5ad8](https://github.com/Lord-ZuzurNC/discord-commit-webhook/commit/69e5ad8610dcdb5f36e3862f51f419c872360f9f))
+
 ## [1.1.0](https://github.com/Lord-ZuzurNC/discord-commit-webhook/compare/v1.0.1...v1.1.0) (2026-10-18)
 
 
