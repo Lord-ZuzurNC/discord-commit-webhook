@@ -14,7 +14,7 @@ jobs:
     steps:
       # release-please talks to the API and checks nothing out, but the
       # major-tag step below needs a real git repository and the existing tags.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
