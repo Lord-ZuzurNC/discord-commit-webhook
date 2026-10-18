@@ -17,6 +17,28 @@ export function readFormats(core) {
   return formats;
 }
 
+// Discord exposes two compatibility endpoints under a webhook: `/github` and
+// `/slack`. They parse a foreign payload shape instead of a Discord message,
+// so posting an embed to one answers `400` with a complaint about a missing
+// field of that foreign shape — `{"sender": ["This field is required"]}` for
+// `/github`. It is a common copy-paste mistake and nothing this action sends
+// could ever work against them.
+const COMPAT_SUFFIX = /\/(github|slack)\/*$/i;
+
+/**
+ * Strip a `/github` or `/slack` compatibility suffix from a webhook URL.
+ *
+ * Returns the usable URL and the suffix that was removed, so the caller can
+ * say what it did instead of silently rewriting the user's configuration.
+ */
+export function normaliseWebhookUrl(rawUrl) {
+  const match = COMPAT_SUFFIX.exec(rawUrl);
+  if (!match) {
+    return { url: rawUrl, strippedSuffix: null };
+  }
+  return { url: rawUrl.slice(0, match.index), strippedSuffix: match[1].toLowerCase() };
+}
+
 /**
  * Resolve the Discord webhook URL from `webhook_url`, or from
  * `webhook_id` + `webhook_token`, registering secrets as it goes.
@@ -35,7 +57,17 @@ export function resolveWebhookUrl(core) {
 
   if (webhookUrl) {
     core.setSecret(webhookUrl);
-    return webhookUrl;
+
+    const { url, strippedSuffix } = normaliseWebhookUrl(webhookUrl);
+    if (strippedSuffix) {
+      // Register the shortened URL too: the masker matches whole registered
+      // strings, so the original registration does not cover this one.
+      core.setSecret(url);
+      core.notice(
+        `Ignoring the /${strippedSuffix} suffix on the webhook URL. That endpoint expects a raw ${strippedSuffix === 'github' ? 'GitHub' : 'Slack'} payload and rejects a Discord embed; posting to the webhook itself instead.`,
+      );
+    }
+    return url;
   }
 
   if (webhookId && webhookToken) {

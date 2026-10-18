@@ -8,11 +8,6 @@ A GitHub Action that posts a summary of a `push` event to a Discord channel or f
   - [Contents](#contents)
   - [Quick start](#quick-start)
   - [Inputs](#inputs)
-  - [Hiding who pushed](#hiding-who-pushed)
-    - [Short and ordinary names](#short-and-ordinary-names)
-  - [Changing the layout](#changing-the-layout)
-    - [What the format strings can and cannot do](#what-the-format-strings-can-and-cannot-do)
-    - [Keeping a format string in a file](#keeping-a-format-string-in-a-file)
   - [Outputs](#outputs)
   - [Posting into a thread or forum post](#posting-into-a-thread-or-forum-post)
   - [Getting a Discord webhook URL](#getting-a-discord-webhook-url)
@@ -201,7 +196,19 @@ Store it as a repository secret, then reference it from your workflow:
 webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
 ```
 
-**Never commit a webhook URL directly into a workflow file**: anyone who can read it can post to your channel.
+Never commit a webhook URL directly into a workflow file: anyone who can read it can post to your channel.
+
+### Do not add `/github` to the URL
+
+Discord also exposes `/github` and `/slack` endpoints under every webhook.
+Those parse a raw GitHub or Slack payload rather than a Discord message, so sending an embed to one answers `400` with a complaint about a field of that foreign shape:
+
+```
+Discord webhook delivery failed with HTTP 400: {"sender": ["This field is required"]}
+```
+
+That suffix is for pointing GitHub's own webhook settings at Discord, not an action.
+This action ignores it and posts to the webhook itself, logging a notice when it does, so an existing secret keeps working — but the suffix serves no purpose here and is clearer removed.
 
 From your repo, go to `Settings` > `Secrets and Variables` > `Actions` > `New repository secret`
 
